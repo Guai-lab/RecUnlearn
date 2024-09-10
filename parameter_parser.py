@@ -3,6 +3,8 @@ import argparse
 
 def parameter_parser():
     parser = argparse.ArgumentParser()
+    # TODO 添加配置，优先级：命令行 > 配置文件 > 默认配置
+
     # 模式选择
     parser.add_argument('--mode', default='train', help='train or test or forget')
 
