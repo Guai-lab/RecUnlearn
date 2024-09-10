@@ -15,7 +15,8 @@ class MF(nn.Module):
         nn.init.zeros_(self.user_bias.weight)
         nn.init.zeros_(self.item_bias.weight)
 
-    def forward(self, user_ids, item_ids):
+    def forward(self, data):
+        user_ids, item_ids = data[:, 0], data[:, 1]
         user_embeds = self.user_embedding(user_ids)
         item_embeds = self.item_embedding(item_ids)
         user_bias = self.user_bias(user_ids).squeeze()
@@ -23,3 +24,8 @@ class MF(nn.Module):
 
         dot_product = (user_embeds * item_embeds).sum(dim=1)
         return dot_product + user_bias + item_bias
+
+    @staticmethod
+    def getloss(pred, target):
+        criterion = nn.MSELoss()
+        return criterion(pred, target).item()

@@ -10,14 +10,21 @@ from config.path import dataset_path
 class GetDataLoder:
 
     def __init__(self, args):
+        self.mode = None
+        self.dataset = None
+        self.way = None
+        self.logger = logging.getLogger('Load_data')
         self.test_loader = None
         self.train_loader = None
-        self.logger = logging.getLogger('Load_data')
+        self.num_users, num_items = None, None
         self.args = args
+        self.init()
+
+    def init(self):
         self.logger.info("Load_data")
-        self.way = self.__getway__(args['model'])
-        self.dataset = self.getdataset(args)
-        self.mode = args['mode']
+        self.way = self.__getway__(self.args['model'])
+        self.dataset = self.getdataset(self.args)
+        self.mode = self.args['mode']
         self.load()
 
     def getdataset(self, args):
@@ -26,6 +33,8 @@ class GetDataLoder:
         if self.way == 'normal':
             path = dataset_path(dataset_name).normal_path()
             data = pd.read_csv(path, header=0, names=['uid', 'iid', 'rating', 'timestamp'])
+            self.num_users = data['uid'].nunique()
+            self.num_items = data['iid'].nunique()
             return data
         elif self.way == 'seq':
             seq_len = args['seq_len']
@@ -54,9 +63,8 @@ class GetDataLoder:
 
     @staticmethod
     def split_data_by_user_and_timestamp(data, train_ratio=0.8):
-        # Assuming 'data' is a pandas DataFrame with columns ['uid', 'iid', 'rating', 'timestamp']
-        train_data = pd.DataFrame(columns=data.columns)
-        test_data = pd.DataFrame(columns=data.columns)
+        train_data_list = []
+        test_data_list = []
 
         for uid in data['uid'].unique():
             user_data = data[data['uid'] == uid].sort_values(by='timestamp')
@@ -65,10 +73,31 @@ class GetDataLoder:
             user_train_data = user_data[:split_index]
             user_test_data = user_data[split_index:]
 
-            train_data = pd.concat([train_data, user_train_data])
-            test_data = pd.concat([test_data, user_test_data])
+            train_data_list.append(user_train_data)
+            test_data_list.append(user_test_data)
+
+        train_data = pd.concat(train_data_list, ignore_index=True)
+        test_data = pd.concat(test_data_list, ignore_index=True)
 
         return train_data, test_data
+        # # TODO 需修改，不应该用DataFrame,太慢了
+        # train_data = []
+        # test_data = []
+        #
+        # for uid in data['uid'].unique():
+        #     user_data = data[data['uid'] == uid].sort_values(by='timestamp')
+        #     split_index = int(len(user_data) * train_ratio)
+        #
+        #     user_train_data = user_data[:split_index]
+        #     user_test_data = user_data[split_index:]
+        #
+        #     train_data_list.append(user_train_data)
+        #     test_data_list.append(user_test_data)
+        #
+        #     train_data = pd.concat([train_data, user_train_data])
+        #     test_data = pd.concat([test_data, user_test_data])
+        #
+        # return train_data, test_data
 
     @staticmethod
     def __getway__(model_name):
@@ -111,4 +140,11 @@ class CustomDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         # Implement logic to get a single item at index `idx`
-        return self.data.iloc[idx]
+        # return self.data.iloc[idx]
+        row = self.data.iloc[idx]
+        uid = torch.tensor(row['uid'], dtype=torch.long)
+        iid = torch.tensor(row['iid'], dtype=torch.long)
+        rating = torch.tensor(row['rating'], dtype=torch.long)
+        data = torch.stack([uid, iid])
+        target = rating
+        return data, target
